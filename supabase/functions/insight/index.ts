@@ -89,18 +89,48 @@ Deno.serve(async (req: Request) => {
 
     if (path === '/insight/daily' && req.method === 'POST') {
       const { date } = await req.json();
-      
-      const summaryResponse = await fetch(
-        `${supabaseUrl}/functions/v1/summary/daily?date=${date}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-        }
-      );
-      const summaryData = await summaryResponse.json();
 
-      const insightText = generateDailyInsight(summaryData);
+      // Fetch all relevant data for the date
+      const { data: summary } = await supabase
+        .from('daily_summary')
+        .select('*')
+        .eq('date', date)
+        .maybeSingle();
+
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('*, task_sessions(*, task_pause_logs(*))')
+        .eq('date', date);
+
+      // Construct payload for Python backend
+      const payload = {
+        date,
+        summary: summary || {},
+        tasks: tasks || []
+      };
+
+      // Call Python backend
+      // Using 0.0.0.0 or localhost depends on environment. Assuming accessible via localhost/host.docker.internal
+      // If running in Supabase local dev (Docker), host.docker.internal reaches the host.
+      // If running as Deno process locally, localhost works. 
+      // User specified 0.0.0.0 for python server, so it's listening on all interfaces.
+      // We'll try host.docker.internal for Docker compatibility, falling back/assuming it works.
+      // But standard Supabase Edge Functions run in Deno deploy which can't access local.
+      // Assuming this is for LOCAL development as per "d:\kunal projects..." context.
+      const pythonResponse = await fetch('http://host.docker.internal:8000/ai_daily_insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!pythonResponse.ok) {
+        throw new Error(`Python backend error: ${pythonResponse.statusText}`);
+      }
+
+      const insightData = await pythonResponse.json();
+      
+      // Store the structured data as stringified JSON in insight_text to preserve schema compatibility
+      const insightText = JSON.stringify(insightData);
 
       const { data: existing } = await supabase
         .from('ai_insights')
@@ -124,23 +154,55 @@ Deno.serve(async (req: Request) => {
           });
       }
 
-      return new Response(JSON.stringify({ insight_text: insightText }), {
+      // Return the structured data directly
+      return new Response(JSON.stringify(insightData), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (path === '/insight/weekly' && req.method === 'POST') {
-      const summaryResponse = await fetch(
-        `${supabaseUrl}/functions/v1/summary/weekly`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-        }
-      );
-      const summaries = await summaryResponse.json();
+      // Get date range (last 7 days or current week)
+      // The frontend doesn't send date for weekly currently, assumes current week or calculated on server
+      // Let's fetch last 7 days of data for now
+      
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 7);
+      
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
 
-      const insightText = generateWeeklyInsight(summaries);
+      const { data: dailySummaries } = await supabase
+        .from('daily_summary')
+        .select('*')
+        .gte('date', startDateStr)
+        .lte('date', endDateStr);
+
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('*, task_sessions(*, task_pause_logs(*))')
+        .gte('date', startDateStr)
+        .lte('date', endDateStr);
+
+      const payload = {
+        start_date: startDateStr,
+        end_date: endDateStr,
+        daily_summaries: dailySummaries || [],
+        tasks: tasks || []
+      };
+
+      const pythonResponse = await fetch('http://host.docker.internal:8000/weekly_analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!pythonResponse.ok) {
+        throw new Error(`Python backend error: ${pythonResponse.statusText}`);
+      }
+
+      const insightData = await pythonResponse.json();
+      const insightText = JSON.stringify(insightData);
 
       const { data: insight, error } = await supabase
         .from('ai_insights')
@@ -153,7 +215,7 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ insight_text: insightText }), {
+      return new Response(JSON.stringify(insightData), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -162,7 +224,7 @@ Deno.serve(async (req: Request) => {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

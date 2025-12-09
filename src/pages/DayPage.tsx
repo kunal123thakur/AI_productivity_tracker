@@ -9,7 +9,7 @@ import Loader from '../components/Loader';
 import ErrorBox from '../components/ErrorBox';
 import { getTasksByDate, createTask, deleteTask, type Task } from '../api/taskApi';
 import { getDailySummary, type DailySummary } from '../api/summaryApi';
-import { getDailyInsight } from '../api/insightApi';
+import { getDailyInsight, type DailyAIInsight } from '../api/insightApi';
 
 interface DayPageProps {
   date: string;
@@ -27,7 +27,7 @@ export default function DayPage({ date, onBack }: DayPageProps) {
     total_pause_time: 0,
     distractions_count: 0,
   });
-  const [insight, setInsight] = useState<string | null>(null);
+  const [insight, setInsight] = useState<string | DailyAIInsight | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
 
   const loadData = async () => {
@@ -44,7 +44,11 @@ export default function DayPage({ date, onBack }: DayPageProps) {
       if (tasksData.length > 0 && tasksData.some(t => t.status === 'completed')) {
         setInsightLoading(true);
         const insightData = await getDailyInsight(date);
-        setInsight(insightData.insight_text);
+        if ('insight_text' in insightData) {
+          setInsight(insightData.insight_text);
+        } else {
+          setInsight(insightData);
+        }
         setInsightLoading(false);
       }
     } catch (err) {

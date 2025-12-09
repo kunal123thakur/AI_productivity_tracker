@@ -4,11 +4,11 @@ import AiInsightBox from '../components/AiInsightBox';
 import Loader from '../components/Loader';
 import ErrorBox from '../components/ErrorBox';
 import { getWeeklySummary, type WeeklySummaryItem } from '../api/summaryApi';
-import { getWeeklyInsight } from '../api/insightApi';
+import { getWeeklyInsight, type WeeklyAIInsight } from '../api/insightApi';
 
 export default function WeeklySummaryPage() {
   const [summaries, setSummaries] = useState<WeeklySummaryItem[]>([]);
-  const [insight, setInsight] = useState<string | null>(null);
+  const [insight, setInsight] = useState<string | WeeklyAIInsight | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
@@ -24,7 +24,11 @@ export default function WeeklySummaryPage() {
         if (data.length > 0) {
           setInsightLoading(true);
           const insightData = await getWeeklyInsight();
-          setInsight(insightData.insight_text);
+          if ('insight_text' in insightData) {
+            setInsight(insightData.insight_text);
+          } else {
+            setInsight(insightData);
+          }
           setInsightLoading(false);
         }
       } catch (err) {
