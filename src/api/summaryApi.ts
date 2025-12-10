@@ -39,8 +39,13 @@ export const getWeeklySummary = async (): Promise<WeeklySummaryItem[]> => {
   return response.json();
 };
 
-export const getMonthlySummary = async (): Promise<WeeklySummaryItem[]> => {
-  const response = await fetch(`${API_BASE_URL}/summary/monthly`, {
+export const getMonthlySummary = async (month?: number, year?: number): Promise<WeeklySummaryItem[]> => {
+  let url = `${API_BASE_URL}/summary/monthly`;
+  if (month && year) {
+    url += `?month=${month}&year=${year}`;
+  }
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: getHeaders(),
   });

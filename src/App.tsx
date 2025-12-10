@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import CalendarPage from './pages/CalendarPage';
 import DayPage from './pages/DayPage';
 import WeeklySummaryPage from './pages/WeeklySummaryPage';
+import WelcomeSection from './components/WelcomeSection';
 
 type Page = 'calendar' | 'day' | 'weekly';
 
@@ -26,11 +27,15 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
+      <WelcomeSection />
+      
+      <div id="main-content" className="min-h-screen bg-gray-50">
+        <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
 
-      {currentPage === 'calendar' && <CalendarPage onDateSelect={handleDateSelect} />}
-      {currentPage === 'day' && <DayPage date={selectedDate} onBack={handleBackToCalendar} />}
-      {currentPage === 'weekly' && <WeeklySummaryPage />}
+        {currentPage === 'calendar' && <CalendarPage onDateSelect={handleDateSelect} />}
+        {currentPage === 'day' && <DayPage date={selectedDate} onBack={handleBackToCalendar} />}
+        {currentPage === 'weekly' && <WeeklySummaryPage />}
+      </div>
     </div>
   );
 }

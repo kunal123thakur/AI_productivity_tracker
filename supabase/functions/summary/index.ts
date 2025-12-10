@@ -43,23 +43,23 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const taskIds = tasks.map(t => t.id);
+      const taskIds = tasks.map((t: any) => t.id);
 
       const { data: sessions } = await supabase
         .from('task_sessions')
         .select('id, active_duration')
         .in('task_id', taskIds);
 
-      const totalFocusTime = sessions?.reduce((sum, s) => sum + (s.active_duration || 0), 0) || 0;
+      const totalFocusTime = sessions?.reduce((sum: number, s: any) => sum + (s.active_duration || 0), 0) || 0;
 
-      const sessionIds = sessions?.map(s => s.id) || [];
+      const sessionIds = sessions?.map((s: any) => s.id) || [];
       const { data: pauseLogs } = await supabase
         .from('task_pause_logs')
         .select('duration')
         .in('session_id', sessionIds)
         .not('duration', 'is', null);
 
-      const totalPauseTime = pauseLogs?.reduce((sum, p) => sum + (p.duration || 0), 0) || 0;
+      const totalPauseTime = pauseLogs?.reduce((sum: number, p: any) => sum + (p.duration || 0), 0) || 0;
       const distractionsCount = pauseLogs?.length || 0;
 
       const summary = {
@@ -98,15 +98,46 @@ Deno.serve(async (req: Request) => {
     }
 
     if (path === '/summary/monthly' && req.method === 'GET') {
-      const today = new Date();
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(today.getDate() - 30);
+      const year = url.searchParams.get('year');
+      const month = url.searchParams.get('month');
+
+      let startDate, endDate;
+
+      if (year && month) {
+        // Construct start and end dates for the specific month
+        const y = parseInt(year);
+        const m = parseInt(month) - 1; // JS months are 0-11
+        startDate = new Date(y, m, 1);
+        endDate = new Date(y, m + 1, 0); // Last day of the month
+      } else {
+        // Default to last 30 days if no params provided
+        endDate = new Date();
+        startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 30);
+      }
+
+      // Format as YYYY-MM-DD
+      // Note: toISOString() uses UTC. We should be careful with timezones. 
+      // Using simple string formatting to match database DATE type.
+      // const startDateStr = startDate.toISOString().split('T')[0];
+      // const endDateStr = endDate.toISOString().split('T')[0];
+      
+      // Better to use local time construction for date strings to avoid timezone shift issues
+      const formatDate = (d: Date) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
 
       const { data: summaries } = await supabase
         .from('daily_summary')
         .select('*')
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
-        .lte('date', today.toISOString().split('T')[0])
+        .gte('date', startDateStr)
+        .lte('date', endDateStr)
         .order('date', { ascending: true });
 
       return new Response(JSON.stringify(summaries || []), {
@@ -118,7 +149,7 @@ Deno.serve(async (req: Request) => {
       status: 404,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

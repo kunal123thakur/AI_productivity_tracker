@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getMonthlySummary } from '../api/summaryApi';
 
 interface CalendarViewProps {
   onDateSelect: (date: string) => void;
@@ -8,6 +9,26 @@ interface CalendarViewProps {
 
 export default function CalendarView({ onDateSelect, selectedDate }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [distractions, setDistractions] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const fetchMonthlyData = async () => {
+      try {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth() + 1;
+        const summaries = await getMonthlySummary(month, year);
+        
+        const distractionMap: Record<string, number> = {};
+        summaries.forEach(s => {
+          distractionMap[s.date] = s.distractions_count;
+        });
+        setDistractions(distractionMap);
+      } catch (error) {
+        console.error('Failed to fetch monthly summary', error);
+      }
+    };
+    fetchMonthlyData();
+  }, [currentMonth]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -50,6 +71,13 @@ export default function CalendarView({ onDateSelect, selectedDate }: CalendarVie
     return formatDate(day) === selectedDate;
   };
 
+  const getDistractionColor = (count: number) => {
+    if (count < 5) return 'bg-green-700';
+    if (count <= 20) return 'bg-yellow-500';
+    if (count <= 50) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
   const days = [];
   for (let i = 0; i < startingDayOfWeek; i++) {
     days.push(<div key={`empty-${i}`} className="aspect-square" />);
@@ -59,7 +87,7 @@ export default function CalendarView({ onDateSelect, selectedDate }: CalendarVie
       <button
         key={day}
         onClick={() => onDateSelect(formatDate(day))}
-        className={`aspect-square flex items-center justify-center rounded-lg font-medium transition-all ${
+        className={`aspect-square flex flex-col items-center justify-center rounded-lg font-medium transition-all relative ${
           isSelected(day)
             ? 'bg-blue-500 text-white shadow-lg'
             : isToday(day)
@@ -67,7 +95,13 @@ export default function CalendarView({ onDateSelect, selectedDate }: CalendarVie
             : 'text-gray-700 hover:bg-gray-100'
         }`}
       >
-        {day}
+        <span>{day}</span>
+        {distractions[formatDate(day)] !== undefined && (
+          <div 
+            className={`absolute top-1 right-1 w-2 h-2 rounded-full ${getDistractionColor(distractions[formatDate(day)])}`} 
+            title={`Distractions: ${distractions[formatDate(day)]}`}
+          />
+        )}
       </button>
     );
   }
