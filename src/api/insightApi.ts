@@ -1,4 +1,6 @@
-import { API_BASE_URL, getHeaders } from './config';
+import { AI_SERVICE_URL } from './config';
+import { Task } from './taskApi';
+import { DailySummary, WeeklySummaryItem } from './summaryApi';
 
 export interface Insight {
   insight_text: string;
@@ -35,11 +37,11 @@ export interface WeeklyAIInsight {
   daily: Array<{ date: string; study_minutes: number; distractions: number }>;
 }
 
-export const getTaskInsight = async (taskId: number): Promise<Insight> => {
-  const response = await fetch(`${API_BASE_URL}/insight/task`, {
+export const getTaskInsight = async (task: Task): Promise<Insight> => {
+  const response = await fetch(`${AI_SERVICE_URL}/ai_task_insight`, {
     method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ task_id: taskId }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task }),
   });
 
   if (!response.ok) {
@@ -49,11 +51,15 @@ export const getTaskInsight = async (taskId: number): Promise<Insight> => {
   return response.json();
 };
 
-export const getDailyInsight = async (date: string): Promise<DailyAIInsight | Insight> => {
-  const response = await fetch(`${API_BASE_URL}/insight/daily`, {
+export const getDailyInsight = async (date: string, summary: DailySummary, tasks: Task[]): Promise<DailyAIInsight> => {
+  const response = await fetch(`${AI_SERVICE_URL}/ai_daily_insight`, {
     method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ date }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      date, 
+      summary: { ...summary, date, id: 0, created_at: new Date().toISOString() }, 
+      tasks 
+    }),
   });
 
   if (!response.ok) {
@@ -63,10 +69,30 @@ export const getDailyInsight = async (date: string): Promise<DailyAIInsight | In
   return response.json();
 };
 
-export const getWeeklyInsight = async (): Promise<WeeklyAIInsight | Insight> => {
-  const response = await fetch(`${API_BASE_URL}/insight/weekly`, {
+export const getWeeklyInsight = async (
+  startDate: string, 
+  endDate: string, 
+  summaries: WeeklySummaryItem[], 
+  tasks: Task[]
+): Promise<WeeklyAIInsight> => {
+  const daily_summaries = summaries.map((s, i) => ({
+    id: i,
+    date: s.date,
+    total_focus_time: s.total_focus_time,
+    total_pause_time: s.total_pause_time,
+    distractions_count: s.distractions_count,
+    created_at: new Date().toISOString()
+  }));
+
+  const response = await fetch(`${AI_SERVICE_URL}/weekly_analytics`, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      start_date: startDate,
+      end_date: endDate,
+      daily_summaries: daily_summaries,
+      tasks 
+    }),
   });
 
   if (!response.ok) {

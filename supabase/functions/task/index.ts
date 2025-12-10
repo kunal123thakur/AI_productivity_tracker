@@ -40,7 +40,7 @@ Deno.serve(async (req: Request) => {
       
       let query = supabase
         .from('tasks')
-        .select('*')
+        .select('*, task_sessions(*, task_pause_logs(*))')
         .order('created_at', { ascending: true });
 
       if (date) {

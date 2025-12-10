@@ -43,11 +43,11 @@ export default function DayPage({ date, onBack }: DayPageProps) {
 
       if (tasksData.length > 0 && tasksData.some(t => t.status === 'completed')) {
         setInsightLoading(true);
-        const insightData = await getDailyInsight(date);
+        const insightData = await getDailyInsight(date, summaryData, tasksData);
         if ('insight_text' in insightData) {
           setInsight(insightData.insight_text);
         } else {
-          setInsight(insightData);
+          setInsight(insightData as DailyAIInsight);
         }
         setInsightLoading(false);
       }

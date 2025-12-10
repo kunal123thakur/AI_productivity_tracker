@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
       // We'll try host.docker.internal for Docker compatibility, falling back/assuming it works.
       // But standard Supabase Edge Functions run in Deno deploy which can't access local.
       // Assuming this is for LOCAL development as per "d:\kunal projects..." context.
-      const pythonResponse = await fetch('http://host.docker.internal:8000/ai_daily_insight', {
+      const pythonResponse = await fetch('https://python-personalised-timetable-management.onrender.com/ai_daily_insight', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -191,7 +191,7 @@ Deno.serve(async (req: Request) => {
         tasks: tasks || []
       };
 
-      const pythonResponse = await fetch('http://host.docker.internal:8000/weekly_analytics', {
+      const pythonResponse = await fetch('https://python-personalised-timetable-management.onrender.com/weekly_analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

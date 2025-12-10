@@ -4,7 +4,8 @@ import AiInsightBox from '../components/AiInsightBox';
 import Loader from '../components/Loader';
 import ErrorBox from '../components/ErrorBox';
 import { getWeeklySummary, type WeeklySummaryItem } from '../api/summaryApi';
-import { getWeeklyInsight, type WeeklyAIInsight } from '../api/insightApi';
+import { getWeeklyInsight, type WeeklyAIInsight, type Insight } from '../api/insightApi';
+import { getTasksByDate } from '../api/taskApi';
 
 export default function WeeklySummaryPage() {
   const [summaries, setSummaries] = useState<WeeklySummaryItem[]>([]);
@@ -23,11 +24,23 @@ export default function WeeklySummaryPage() {
 
         if (data.length > 0) {
           setInsightLoading(true);
-          const insightData = await getWeeklyInsight();
-          if ('insight_text' in insightData) {
-            setInsight(insightData.insight_text);
+
+          // Sort data by date just in case
+          const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          const startDate = sortedData[0].date;
+          const endDate = sortedData[sortedData.length - 1].date;
+
+          // Fetch tasks for all days
+          const tasksPromises = sortedData.map(day => getTasksByDate(day.date));
+          const tasksArrays = await Promise.all(tasksPromises);
+          const allTasks = tasksArrays.flat();
+
+          const insightData = await getWeeklyInsight(startDate, endDate, sortedData, allTasks);
+          const typedData = insightData as WeeklyAIInsight | Insight;
+          if ('insight_text' in typedData) {
+            setInsight(typedData.insight_text);
           } else {
-            setInsight(insightData);
+            setInsight(typedData as WeeklyAIInsight);
           }
           setInsightLoading(false);
         }
